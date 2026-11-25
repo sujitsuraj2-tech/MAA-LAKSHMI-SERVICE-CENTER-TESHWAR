@@ -1,0 +1,6 @@
+{
+  "name": "MA LAKSHMI AUTO SERVICE CENTER",
+  "description": "Complete Bike Repairing & Servicing Solution by Dhanjay Kumar — Servicing, Engine Repair, Electricals, Bike Wash, and Pickup & Drop.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
