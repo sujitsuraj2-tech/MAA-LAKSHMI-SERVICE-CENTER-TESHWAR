@@ -102,6 +102,12 @@ export default function Header() {
               >
                 Shop Owner
               </a>
+              <a
+                href="#qr-scanner"
+                className="hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
+              >
+                QR Scanner
+              </a>
             </nav>
 
             <div className="flex flex-wrap items-center gap-3 shrink-0">

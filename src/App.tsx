@@ -4,6 +4,7 @@ import ServicesGrid from './components/ServicesGrid';
 import WorkshopShowcase from './components/WorkshopShowcase';
 import ContactSection from './components/ContactSection';
 import ShopOwnerSection from './components/ShopOwnerSection';
+import QrCodeSection from './components/QrCodeSection';
 import Footer from './components/Footer';
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
         <WorkshopShowcase />
         <ContactSection />
         <ShopOwnerSection />
+        <QrCodeSection />
       </main>
       <Footer />
     </div>
