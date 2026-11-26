@@ -33,7 +33,7 @@ import {
   type BikeService,
   type ServiceCategory,
   type ServiceIconName,
-} from '../data/services';
+} from '../constants/services';
 import {buildWhatsAppUrl} from '../constants/workshop';
 
 function ServiceIcon({name, className}: {name: ServiceIconName; className?: string}) {

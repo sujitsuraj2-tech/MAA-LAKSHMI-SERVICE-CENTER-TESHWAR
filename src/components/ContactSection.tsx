@@ -19,7 +19,7 @@ import {
   SHOP_NAME,
   WHATSAPP_LINK,
 } from '../constants/workshop';
-import {BIKE_SERVICES} from '../data/services';
+import {BIKE_SERVICES} from '../constants/services';
 
 interface ConfirmedBooking {
   id: string;
