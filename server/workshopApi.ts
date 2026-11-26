@@ -7,6 +7,7 @@ const DATA_DIR = resolveWritableDataDir();
 const OWNER_PHOTO_FILE = resolveSafeDataPath('owner-photo.json');
 const ADMIN_AUTH_FILE = resolveSafeDataPath('admin-auth.json');
 const BOOKINGS_FILE = resolveSafeDataPath('bookings.json');
+const REVIEWS_FILE = resolveSafeDataPath('reviews.json');
 
 // Session signing key: read from env or fall back to an in-memory random 256-bit key.
 const SESSION_SECRET =
@@ -63,6 +64,15 @@ export interface BookingRecord {
   preferredDate: string;
   pickupNeeded: boolean;
   notes: string;
+  createdAt: string;
+}
+
+export interface ReviewRecord {
+  id: string;
+  customerName: string;
+  bikeModel: string;
+  rating: number;
+  comment: string;
   createdAt: string;
 }
 
@@ -172,8 +182,14 @@ async function supabaseUpsertStoreRow(
       return {ok: false, conflict: true};
     }
 
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      console.error(`Supabase workshop_store upsert failed (${res.status}):`, detail.slice(0, 300));
+    }
+
     return {ok: res.ok};
-  } catch {
+  } catch (err: unknown) {
+    console.error('Supabase workshop_store request error:', err);
     return {ok: false};
   }
 }
@@ -207,8 +223,13 @@ async function supabaseInsertBooking(booking: BookingRecord): Promise<boolean> {
         created_at: booking.createdAt,
       }),
     });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      console.error(`Supabase service_bookings insert failed (${res.status}):`, detail.slice(0, 300));
+    }
     return res.ok;
-  } catch {
+  } catch (err: unknown) {
+    console.error('Supabase service_bookings request error:', err);
     return false;
   }
 }
@@ -252,6 +273,80 @@ async function supabaseListBookings(): Promise<BookingRecord[] | null> {
     }));
   } catch {
     return null;
+  }
+}
+
+async function supabaseListReviews(): Promise<ReviewRecord[] | null> {
+  const cfg = getSupabaseConfig();
+  if (!cfg) {
+    return null;
+  }
+
+  try {
+    const url = new URL('/rest/v1/customer_reviews', cfg.baseUrl);
+    url.searchParams.set('select', 'id,customer_name,bike_model,rating,comment,created_at');
+    url.searchParams.set('order', 'created_at.desc');
+    url.searchParams.set('limit', '50');
+
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        apikey: cfg.readKey,
+        Authorization: `Bearer ${cfg.readKey}`,
+        Accept: 'application/json',
+      },
+    });
+    if (!res.ok) {
+      return null;
+    }
+
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    return rows.map((row) => ({
+      id: String(row.id ?? ''),
+      customerName: String(row.customer_name ?? ''),
+      bikeModel: String(row.bike_model ?? ''),
+      rating: Math.min(5, Math.max(1, Math.round(Number(row.rating ?? 5)))),
+      comment: String(row.comment ?? ''),
+      createdAt: String(row.created_at ?? ''),
+    }));
+  } catch {
+    return null;
+  }
+}
+
+async function supabaseInsertReview(review: ReviewRecord): Promise<boolean> {
+  const cfg = getSupabaseConfig();
+  if (!cfg) {
+    return false;
+  }
+
+  try {
+    const url = new URL('/rest/v1/customer_reviews', cfg.baseUrl);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        apikey: cfg.writeKey,
+        Authorization: `Bearer ${cfg.writeKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        id: review.id,
+        customer_name: review.customerName,
+        bike_model: review.bikeModel,
+        rating: review.rating,
+        comment: review.comment,
+        created_at: review.createdAt,
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      console.error(`Supabase customer_reviews insert failed (${res.status}):`, detail.slice(0, 300));
+    }
+    return res.ok;
+  } catch (err: unknown) {
+    console.error('Supabase customer_reviews request error:', err);
+    return false;
   }
 }
 
@@ -361,6 +456,31 @@ function appendLocalBooking(booking: BookingRecord): void {
   fs.renameSync(tempFile, BOOKINGS_FILE);
 }
 
+function readLocalReviews(): ReviewRecord[] {
+  try {
+    if (!fs.existsSync(REVIEWS_FILE)) {
+      return [];
+    }
+    const parsed = JSON.parse(fs.readFileSync(REVIEWS_FILE, 'utf8'));
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed as ReviewRecord[];
+  } catch {
+    return [];
+  }
+}
+
+function appendLocalReview(review: ReviewRecord): void {
+  ensureDataDir();
+  const existing = readLocalReviews();
+  existing.unshift(review);
+  const trimmed = existing.slice(0, 100);
+  const tempFile = resolveSafeDataPath(`reviews.${crypto.randomBytes(6).toString('hex')}.tmp`);
+  fs.writeFileSync(tempFile, JSON.stringify(trimmed, null, 2), 'utf8');
+  fs.renameSync(tempFile, REVIEWS_FILE);
+}
+
 function hashPasscode(passcode: string, saltHex: string): string {
   return crypto.scryptSync(passcode, saltHex, 64).toString('hex');
 }
@@ -446,13 +566,17 @@ export async function handleApiRequest(input: ApiRequestInput): Promise<ApiRespo
   const body = input.body ?? {};
 
   if (method === 'GET' && normalizedPath === '/api/health') {
-    const supabaseConfigured = getSupabaseConfig() !== null;
+    const cfg = getSupabaseConfig();
+    const isNetlify = Boolean(
+      process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.SITE_NAME,
+    );
     return {
       status: 200,
       data: {
         ok: true,
-        storage: supabaseConfigured ? 'supabase' : 'local',
-        platform: process.env.NETLIFY ? 'netlify' : 'node',
+        storage: cfg ? 'supabase' : 'local',
+        hasServiceRole: Boolean(cfg?.hasServiceRole),
+        platform: isNetlify ? 'netlify' : 'node',
       },
     };
   }
@@ -705,6 +829,81 @@ export async function handleApiRequest(input: ApiRequestInput): Promise<ApiRespo
       return {status: 200, data: {bookings: Array.isArray(parsed) ? parsed : []}};
     } catch {
       return {status: 500, data: {error: 'Unable to read bookings.'}};
+    }
+  }
+
+  if (method === 'GET' && normalizedPath === '/api/reviews') {
+    const remoteReviews = await supabaseListReviews();
+    const reviews = remoteReviews ?? readLocalReviews();
+    const totalReviews = reviews.length;
+    const averageRating =
+      totalReviews > 0
+        ? Number((reviews.reduce((sum, item) => sum + item.rating, 0) / totalReviews).toFixed(1))
+        : 0;
+
+    return {
+      status: 200,
+      data: {
+        reviews,
+        totalReviews,
+        averageRating,
+      },
+    };
+  }
+
+  if (method === 'POST' && normalizedPath === '/api/reviews') {
+    const customerName = typeof body.customerName === 'string' ? body.customerName.trim() : '';
+    const bikeModel = typeof body.bikeModel === 'string' ? body.bikeModel.trim().slice(0, 80) : '';
+    const rawRating = Number(body.rating);
+    const rating = Number.isInteger(rawRating) ? rawRating : NaN;
+    const comment = typeof body.comment === 'string' ? body.comment.trim() : '';
+
+    if (customerName.length < 2 || customerName.length > 80) {
+      return {
+        status: 400,
+        data: {error: 'Kripya apna sahi naam likhein (kam se kam 2 akshar).'},
+      };
+    }
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return {
+        status: 400,
+        data: {error: 'Kripya 1 se 5 star ke beech rating chunein.'},
+      };
+    }
+    if (comment.length < 5 || comment.length > 500) {
+      return {
+        status: 400,
+        data: {error: 'Kripya apna anubhav kam se kam 5 aksharon mein likhein.'},
+      };
+    }
+
+    const review: ReviewRecord = {
+      id: crypto.randomUUID(),
+      customerName,
+      bikeModel,
+      rating,
+      comment,
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      const savedRemote = await supabaseInsertReview(review);
+      if (!savedRemote) {
+        appendLocalReview(review);
+      }
+      return {
+        status: 201,
+        data: {
+          ok: true,
+          storage: savedRemote ? 'supabase' : 'local',
+          review,
+        },
+      };
+    } catch {
+      return {
+        status: 500,
+        data: {error: 'Review save karne mein samasya aayi. Kripya dobara koshish karein.'},
+      };
     }
   }
 

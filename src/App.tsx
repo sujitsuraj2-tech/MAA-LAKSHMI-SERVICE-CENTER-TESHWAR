@@ -2,6 +2,7 @@ import Header from './components/Header';
 import Hero from './components/Hero';
 import ServicesGrid from './components/ServicesGrid';
 import WorkshopShowcase from './components/WorkshopShowcase';
+import ReviewsSection from './components/ReviewsSection';
 import ContactSection from './components/ContactSection';
 import ShopOwnerSection from './components/ShopOwnerSection';
 import QrCodeSection from './components/QrCodeSection';
@@ -15,6 +16,7 @@ export default function App() {
         <Hero />
         <ServicesGrid />
         <WorkshopShowcase />
+        <ReviewsSection />
         <ContactSection />
         <ShopOwnerSection />
         <QrCodeSection />

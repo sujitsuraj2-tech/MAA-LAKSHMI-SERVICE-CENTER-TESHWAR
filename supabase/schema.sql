@@ -48,3 +48,34 @@ create policy "Allow insert service bookings"
     and char_length(bike_model) >= 1
     and char_length(service_name) >= 1
   );
+
+create table if not exists public.customer_reviews (
+  id uuid primary key default gen_random_uuid(),
+  customer_name text not null,
+  bike_model text not null default '',
+  rating integer not null check (rating >= 1 and rating <= 5),
+  comment text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.customer_reviews enable row level security;
+
+drop policy if exists "Public can read customer reviews" on public.customer_reviews;
+create policy "Public can read customer reviews"
+  on public.customer_reviews
+  for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "Allow insert customer reviews" on public.customer_reviews;
+create policy "Allow insert customer reviews"
+  on public.customer_reviews
+  for insert
+  to anon, authenticated
+  with check (
+    char_length(customer_name) >= 2
+    and rating >= 1
+    and rating <= 5
+    and char_length(comment) >= 5
+  );
+

@@ -91,6 +91,12 @@ export default function Header() {
                 Workshop
               </a>
               <a
+                href="#reviews"
+                className="hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
+              >
+                Reviews
+              </a>
+              <a
                 href="#contact"
                 className="hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
               >
