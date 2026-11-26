@@ -4,7 +4,7 @@ export const SHOP_ADDRESS = 'Main Road, Aanand Bazar, Teshwar, Gaya, Bihar';
 export const DEVELOPER_CREDIT = 'Developed by Sujit Razz';
 export const CONTACT_NUMBER = '7634807282';
 export const CALL_LINK = 'tel:7634807282';
-export const DEFAULT_PUBLIC_SITE_URL = 'https://dhanjay-herohonda-teshwar.netlify.app';
+export const DEFAULT_PUBLIC_SITE_URL = 'https://dkteshwar.netlify.app';
 
 export function buildWhatsAppUrl(message?: string): string {
   const defaultMsg =
